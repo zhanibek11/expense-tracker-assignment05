@@ -3,29 +3,35 @@ import json
 import sys
 
 
+FEE_RULES = {
+    "card": lambda amount: amount * 0.02,
+    "transfer": lambda amount: 1.0,
+    "cash": lambda amount: 0.0,
+}
+
+
+def validate(expense):
+    amount = expense["amount"]
+    if isinstance(amount, bool) or not isinstance(amount, (int, float)) or amount <= 0:
+        raise ValueError(f"invalid amount: {amount!r}")
+    if expense["method"] not in FEE_RULES:
+        raise ValueError(f"unknown payment method: {expense['method']!r}")
+
+
 def fee(method, amount):
-    if method == "card":
-        return amount * 0.02
-    elif method == "transfer":
-        return 1.0
-    elif method == "cash":
-        return 0
-    else:
-        return 0
+    if method not in FEE_RULES:
+        raise ValueError(f"unknown payment method: {method!r}")
+    return FEE_RULES[method](amount)
 
 
 def summarize(expenses):
     total = 0
     by_category = {}
     for e in expenses:
-        if e["method"] == "card":
-            total += e["amount"] + e["amount"] * 0.02
-        elif e["method"] == "transfer":
-            total += e["amount"] + 1.0
-        else:
-            total += e["amount"]
+        validate(e)
+        total += e["amount"] + fee(e["method"], e["amount"])
         by_category[e["category"]] = by_category.get(e["category"], 0) + e["amount"]
-    return total, by_category
+    return round(total, 2), {k: round(v, 2) for k, v in by_category.items()}
 
 
 def main(argv):
